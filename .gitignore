@@ -1,0 +1,15 @@
+/*
+
+!.gitignore
+!docker-compose.yml
+!README
+
+!nginx
+nginx/*
+!/nginx/Dockerfile
+!/nginx/nginx.conf
+!/nginx/placeholder_html/
+
+!rocket_chat
+rocket_chat/*
+!rocket_chat/Dockerfile
