@@ -2,100 +2,113 @@
 version: '3'
 services:
   nginx_reverse_proxy:
-    build: ./nginx
     container_name: nginx
+    build: ./nginx
     restart: unless-stopped
     ports:
       - 80:80
       - 443:443
-    networks:
-      docker_network:
-        aliases:
-          - docker_network
+    depends_on:
+      - rocketchat
+    #networks:
+      #docker_network:
+        #aliases:
+          #- nginx_reverse_proxy
     volumes:
-      - /home/dennis/Docker_Volumes/nginx/reverse_proxy
+      - /home/dennis/Docker_Volumes/nginx:/reverse_proxy
+
+  # nginx_web_server:
+  #   build: ./nginx_webserver
+  #   container_name: nginx_webserver
+  #   restart: unless-stopped
+  #   ports: 
 
   rocketchat:
-    build: ./rocket_chat
-    command: >
-      bash -c
-      "for i in `seq 1 30`; do
-      node main.js &&
-      s=$$? && break || s=$$?;
-      echo \"Tried $$i times. Waiting 5 secs...\";
-      sleep 5;
-      done; (exit $$s)"
-      restart: unless-stopped
+    container_name: rocket_chat
+    image: rocketchat/rocket.chat:latest
+    restart: unless-stopped
+    ports:
+      - 3000:3000
+    depends_on:
+      - mongo
+    #networks:
+      #docker_network:
+        #aliases:
+          #- rocketchat
     volumes:
       - /home/dennis/Docker_Volumes/rocket_chat/uploads:/app/uploads
+    command: >
+      bash -c
+        "for (( ; ; )); do
+          node main.js &&
+          s=$$? && break || s=$$?;
+          echo \"Could not start Rocket.Chat. Waiting 5 secs...\";
+          sleep 5;
+        done; (exit $$s)"
     environment:
       - PORT=3000
-      #- ROOT_URL=http://localhost:3000
-      #- ROOT_URL=https://www.dennismarwood.com:3000
-      #- ROOT_URL=https://www.dennismarwood.com
       - ROOT_URL=https://chat.dennismarwood.com
       - MONGO_URL=mongodb://mongo:27017/rocketchat
       - MONGO_OPLOG_URL=mongodb://mongo:27017/local
       - MAIL_URL=smtp://smtp.email
-      #- HTTP_PROXY=http://proxy.domain.com
-      #- HTTPS_PROXY=http://proxy.domain.com
       - HTTP_FORWARDED_COUNT=1
-    depends_on:
-      - mongo
-    ports:
-      - 3000:3000
     labels:
+      #- "traefik.enable=false"
       - "traefik.backend=rocketchat"
       - "traefik.frontend.rule=Host: chat.dennismarwood.com"
-    networks:
-      docker_network:
-        aliases:
-          - rocketchat
 
   mongo:
-    image: mongo:4.0
+    container_name: mongo
+    image: mongo:5.0
     restart: unless-stopped
+    #networks:
+      #docker_network:
+        #aliases:
+          #- mongo 
     volumes:
     - /home/dennis/Docker_Volumes/mongo/data/db:/data/db
     - /home/dennis/Docker_Volumes/mongo/data/dump:/dump
-    command: mongod --smallfiles --oplogSize 128 --replSet rs0 --storageEngine=mmapv1
+    #command: mongod --smallfiles --oplogSize 128 --replSet rs0 --storageEngine=mmapv1
+    #command: mongod --oplogSize 128 --replSet rs0 --storageEngine=mmapv1
+    command: >
+      bash -c
+        "while [ ! -f /data/db/WiredTiger ]; do
+          echo \"wiredTiger migration hasn't started yet. Waiting 30 secs...\";
+          sleep 30;
+        done;
+        docker-entrypoint.sh mongod --oplogSize 128 --replSet rs0 --storageEngine=wiredTiger;"
     labels:
     - "traefik.enable=false"
-    ports:
-      - 27017:27017
-    networks:
-      docker_network:
-        aliases:
-          - mongo 
 
   # this container's job is just run the command to initialize the replica set.
   # it will run the command and remove himself (it will not stay running)
   mongo-init-replica:
-    image: mongo:4.0
-    command: >
-      bash -c
-      "for i in `seq 1 30`; do
-      mongo mongo/rocketchat --eval \"
-      rs.initiate({
-      _id: 'rs0',
-      members: [ { _id: 0, host: 'localhost:27017' } ]})\" &&
-      s=$$? && break || s=$$?;
-      echo \"Tried $$i times. Waiting 5 secs...\";
-      sleep 5;
-      done; (exit $$s)"
+    container_name: mongo-init-replica
+    image: mongo:5.0
     depends_on:
       - mongo
-    networks:
-      docker_network:
-        aliases:
-          - mongo_replica
+    #networks:
+      #docker_network:
+        #aliases:
+          #- mongo_replica
+    command: >
+      bash -c
+        "for (( ; ; )); do
+          mongo mongo/rocketchat --eval \"
+            rs.initiate({
+              _id: 'rs0',
+              members: [ { _id: 0, host: 'localhost:27017' } ]})\" &&
+          s=$$? && break || s=$$?;
+          echo \"Could not reach MongoDB. Waiting 5 secs ...\";
+          sleep 5;
+        done; (exit $$s)"
 
 # a network is how we allow our containers to talk to one another
-networks:
+#networks:
   #This is the name at the container level
-  docker_network:
+  #docker_network:
     #This is the name at the compose file level
-    name: docker_network
+    #name: docker_network
 
 # hubot, the popular chatbot (add the bot user first and change the password before starting this image)
 #hubot:
@@ -118,24 +131,3 @@ networks:
 # this is used to expose the hubot port for notifications on the host on port 3001, e.g. for hubot-jenkins-notifier
 #ports:
 #- 3001:8080
-
-#traefik:
-#  image: traefik:latest
-#  restart: unless-stopped
-#  command: >
-#    traefik
-#     --docker
-#     --acme=true
-#     --acme.domains='your.domain.tld'
-#     --acme.email='your@email.tld'
-#     --acme.entrypoint=https
-#     --acme.storagefile=acme.json
-#     --defaultentrypoints=http
-#     --defaultentrypoints=https
-#     --entryPoints='Name:http Address::80 Redirect.EntryPoint:https'
-#     --entryPoints='Name:https Address::443 TLS.Certificates:'
-#  ports:
-#    - 80:80
-#    - 443:443
-#  volumes:
-#    - /var/run/docker.sock:/var/run/docker.sock

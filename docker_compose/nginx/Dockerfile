@@ -1,4 +1,4 @@
-FROM nginx:latest
+FROM nginx:1.21.4
 
 RUN apt-get update && \
 	apt-get install zip -y
@@ -22,3 +22,4 @@ COPY ./placeholder_html/hire_index.html /www/data/
 COPY ./placeholder_html/mail_index.html /www/data/
 COPY ./placeholder_html/portfolio_index.html /www/data/
 COPY ./placeholder_html/resume_index.html /www/data/
+COPY ./placeholder_html/yzaTwDo1lRdXkn1JXwXPhfjSVHJJ941ts0HQR4E1OV0.html /www/data/.well-known/acme-challenge/yzaTwDo1lRdXkn1JXwXPhfjSVHJJ941ts0HQR4E1OV0/
