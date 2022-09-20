@@ -2,14 +2,16 @@
 
 !.gitignore
 !README
-!docker_compose/
-!docker-compose.yml
+!docker_compose/docker-compose.yml
 
-!nginx
-nginx/*
+!back/Dockerfile
+!front/Dockerfile
+
+#!nginx
 !nginx/Dockerfile
 !nginx/nginx.conf
 !nginx/placeholder_html/
+#!nginx/Dockerfile #gets updates for letsencrypt changes that don't need to be checked in
 
 !rocket_chat
 rocket_chat/*
