@@ -3,7 +3,7 @@ version: '3'
 services:
   nginx_reverse_proxy:
     container_name: nginx
-    build: ./nginx
+    build: ../nginx
     restart: unless-stopped
     ports:
       - 80:80
@@ -17,15 +17,42 @@ services:
     volumes:
       - /home/dennis/Docker_Volumes/nginx:/reverse_proxy
 
-  # nginx_web_server:
-  #   build: ./nginx_webserver
-  #   container_name: nginx_webserver
-  #   restart: unless-stopped
-  #   ports: 
+  front:
+    container_name: front
+    #build: ./front
+    image: front:release
+    restart: unless-stopped
+    command: ["./front"]
+    ports:
+      - 8000:8000
+  
+  back:
+    container_name: back
+    build:
+      context: ../../../Homepage/Rocket_back/
+      dockerfile: $PWD/../back/Dockerfile
+    image: back:release
+    restart: unless-stopped
+    ports:
+      - 8001:8001
+    env_file:
+      - secret_env/homepage_db/back_secret.env
+    #command: ["./back"]
+    command: ["tail", "-f", "/dev/null"]
+
+  homepage_db:
+    container_name: homepage_db
+    image: mysql:8.0.30
+    ports:
+      - "8002:3306"
+    env_file:
+      - /home/dennis/gits/server/docker_compose/secret_env/homepage_db/db_secret.env
+    volumes:
+      - /home/dennis/Docker_Volumes/Homepage/db/mysql_docker_volume/:/var/lib/mysql
 
   rocketchat:
     container_name: rocket_chat
-    image: rocketchat/rocket.chat:latest
+    image: rocketchat/rocket.chat:4.8.2
     restart: unless-stopped
     ports:
       - 3000:3000
